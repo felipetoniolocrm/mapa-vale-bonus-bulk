@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    
+        <script>
+            L_NO_TOUCH = false;
+            L_DISABLE_3D = false;
+        </script>
+    
+    <style>html, body {width: 100%;height: 100%;margin: 0;padding: 0;}</style>
+    <style>#map {position:absolute;top:0;bottom:0;right:0;left:0;}</style>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_a02462b9792d9cee3fd6c61a272f6777 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+        
+</head>
+<body>
+    
+    
+<style>
+.animated-icon {
+    width: 40px;
+    height: 40px;
+    background-size: cover;
+    background-position: center;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
+    animation: appear 0.4s ease-out;
+    position: absolute;
+    z-index: 900; /* abaixo do cluster-circle */
+    opacity: 1;
+}
+@keyframes appear {
+    from { transform: scale(0.5); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+.animated-icon:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 12px rgba(0,0,0,0.5);
+    cursor: pointer;
+}
+</style>
+
+    
+<div style="position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; background: #F9A81B; padding: 6px 12px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.35); font-family: Arial, sans-serif; color: #000; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; max-width: 95%; min-width: 220px; width: auto; transition: all 0.3s ease;">
+    <img src="https://i.imgur.com/qsKvPzE.png" style="height: 32px; margin-right: 8px;" alt="Logo">
+    <label>Oferta:
+        <input id="filtroOferta" type="text" list="listaOferta" placeholder="ex: Adidas" style="width: 120px; padding: 6px; border: none; border-radius: 6px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);">
+    </label>
+    <label>Endereço:
+        <input id="filtroEndereco" type="text" list="listaEndereco" placeholder="ex: Paulista" style="width: 150px; padding: 6px; border: none; border-radius: 6px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);">
+    </label>
+    <label>VB:
+        <input id="filtroVBMin" type="number" value="0" style="width: 60px; padding: 5px; border-radius: 6px;"> - 
+        <input id="filtroVBMax" type="number" value="1000" style="width: 60px; padding: 5px; border-radius: 6px;">
+    </label>
+    <label>%:
+        <input id="filtroPctMin" type="number" value="0" style="width: 60px; padding: 5px; border-radius: 6px;">
+    </label>
+    <button onclick="aplicarFiltro()" style="background-color: black; color: white; padding: 8px 14px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Filtrar</button>
+    <button onclick="limparFiltro()" style="background-color: #D32F2F; color: white; padding: 8px 14px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Limpar Filtros</button>
+</div>
+<datalist id="listaOferta"></datalist>
+<datalist id="listaEndereco"></datalist>
+<script>
+function aplicarFiltro() {
+    const oferta = document.getElementById('filtroOferta').value.trim().toLowerCase();
+    const endereco = document.getElementById('filtroEndereco').value.trim().toLowerCase();
+    const vbMin = parseFloat(document.getElementById('filtroVBMin').value) || 0;
+    const vbMax = parseFloat(document.getElementById('filtroVBMax').value) || 100000;
+    const pctMin = parseFloat(document.getElementById('filtroPctMin').value) || 0;
+    const allMarkers = document.querySelectorAll('.animated-icon');
+    allMarkers.forEach(el => {
+        const elOferta = el.dataset.oferta || "";
+        const elEndereco = el.dataset.endereco || "";
+        const elVB = parseFloat(el.dataset.vb) || 0;
+        const elPct = parseFloat(el.dataset.porcentagem) || 0;
+        const match = (!oferta || elOferta.includes(oferta)) && (!endereco || elEndereco.includes(endereco)) && (elVB >= vbMin && elVB <= vbMax) && (elPct >= pctMin);
+        el.style.display = match ? "" : "none";
+    });
+}
+
+function limparFiltro() {
+    document.getElementById('filtroOferta').value = '';
+    document.getElementById('filtroEndereco').value = '';
+    document.getElementById('filtroVBMin').value = 0;
+    document.getElementById('filtroVBMax').value = 1000;
+    document.getElementById('filtroPctMin').value = 0;
+    aplicarFiltro();
+}
+
+// Função para capitalizar a primeira letra de cada palavra (e não transformar em minúsculas)
+function capitalize(str) {
+    return str.replace(/\w/g, char => char.toUpperCase());
+}
+
+// Atualiza as sugestões de oferta conforme digitação
+document.getElementById('filtroOferta').addEventListener('input', function() {
+    const filtro = this.value.toLowerCase(); // Converte o filtro para minúsculas para busca eficiente
+    const listaOferta = document.getElementById('listaOferta');
+    listaOferta.innerHTML = ''; // Limpa as sugestões anteriores
+
+    // Remover duplicatas e garantir ordem alfabética
+    const ofertas = Array.from(new Set([...document.querySelectorAll('.animated-icon')].map(icon => icon.dataset.oferta)))
+        .filter(oferta => oferta.toLowerCase().includes(filtro)) // Filtra as ofertas com base no texto digitado
+        .sort(); // Ordena alfabeticamente
+
+    ofertas.forEach(oferta => {
+        const option = document.createElement('option');
+        option.value = capitalize(oferta); // Capitaliza a opção antes de adicionar ao datalist
+        listaOferta.appendChild(option);
+    });
+});
+
+// Atualiza as sugestões de endereço conforme digitação
+document.getElementById('filtroEndereco').addEventListener('input', function() {
+    const filtro = this.value.toLowerCase(); // Converte o filtro para minúsculas para busca eficiente
+    const listaEndereco = document.getElementById('listaEndereco');
+    listaEndereco.innerHTML = ''; // Limpa as sugestões anteriores
+
+    // Remover duplicatas e garantir ordem alfabética
+    const enderecos = Array.from(new Set([...document.querySelectorAll('.animated-icon')].map(icon => icon.dataset.endereco)))
+        .filter(endereco => endereco.toLowerCase().includes(filtro)) // Filtra os endereços com base no texto digitado
+        .sort(); // Ordena alfabeticamente
+
+    enderecos.forEach(endereco => {
+        const option = document.createElement('option');
+        option.value = capitalize(endereco); // Capitaliza a opção antes de adicionar ao datalist
+        listaEndereco.appendChild(option);
+    });
+});
+
+// Aplique a capitalização para o valor do filtro de Oferta quando o campo perde o foco
+document.getElementById('filtroOferta').addEventListener('blur', function() {
+    this.value = capitalize(this.value); // Aplica a capitalização ao valor digitado no input
+});
+
+// Aplique a capitalização para o valor do filtro de Endereço quando o campo perde o foco
+document.getElementById('filtroEndereco').addEventListener('blur', function() {
+    this.value = capitalize(this.value); // Aplica a capitalização ao valor digitado no input
+});
+
+
+// Ajusta o estilo do filtro para dispositivos móveis
+if (window.innerWidth <= 768) {
+    const filtroBar = document.querySelector('div');
+    filtroBar.style.padding = '6px 12px';
+    filtroBar.style.height = 'auto';
+    filtroBar.style.maxHeight = '60px';
+}
+
+// Melhora a fluidez do mapa (opções de renderização)
+map.options.renderer = L.canvas();
+map.options.zoomAnimation = true;
+map.options.fadeAnimation = true;
+
+map.on('zoomend', () => {
+    const zoom = map.getZoom();
+    const icons = document.querySelectorAll('.animated-icon');
+    icons.forEach(el => {
+        const x = parseInt(el.dataset.x || 0);
+        const y = parseInt(el.dataset.y || 0);
+        const gsize = parseInt(el.dataset.gsize || 1);
+        const centerOffset = parseFloat(el.dataset.centeroffset || 0);
+        let spacing = 0;
+        if (zoom <= 10) {
+            spacing = 15; // pixels: bem fechado
+            el.style.opacity = 0.3;
+            el.style.width = '18px';
+            el.style.height = '18px';
+        } else if (zoom == 11) {
+            spacing = 35;
+            el.style.opacity = 0.75;
+            el.style.width = '28px';
+            el.style.height = '28px';
+        } else {
+            spacing = 75; // máximo visível
+            el.style.opacity = 1;
+            el.style.width = '40px';
+            el.style.height = '40px';
+        }
+
+        el.style.opacity = zoom <= 10 ? 0.15 : zoom == 11 ? 0.6 : 1;
+        const tx = (x + centerOffset) * spacing;
+        const ty = (y + centerOffset) * spacing;
+        el.style.transform = `translate(${tx}px, ${ty}px)`;
+    });
+});
+</script>
+    
+            <div class="folium-map" id="map_a02462b9792d9cee3fd6c61a272f6777" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_a02462b9792d9cee3fd6c61a272f6777 = L.map(
+                "map_a02462b9792d9cee3fd6c61a272f6777",
+                {
+                    center: [-23.55052, -46.63331],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 5,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_4d0000f2d219a03edcf129ec4f3e5bd1 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_4d0000f2d219a03edcf129ec4f3e5bd1.addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var marker_aa72997fc3f9e3cb54e6667d94e7ac48 = L.marker(
+                [-23.5421987, -46.6574679],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_b22b50093ff588d6f8cb498acb47b6c0 = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Adidas_Originals_-23.54220_-46.65747\" class=\u0027animated-icon\u0027\n            data-oferta=\"adidas originals\"\n            data-endereco=\"avenida higien\u00f3polis 618, s\u00e3o paulo, sp\"\n            data-vb=\"50.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"2\"\n            data-lat=\"-23.5421237\"\n            data-lon=\"-46.6573929\"\n            data-centeroffset=\"-0.5\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/4d4fa76a-3fa5-42ba-982d-88adbf9fa6f6/logo/Adidas_logo.jpg\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_aa72997fc3f9e3cb54e6667d94e7ac48.setIcon(div_icon_b22b50093ff588d6f8cb498acb47b6c0);
+        
+    
+        var popup_ed477429b44e15dd602b715f34b7d7dd = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_b38b012557547fce75231e848ae8f8f0 = $(`<div id="html_b38b012557547fce75231e848ae8f8f0" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Adidas Originals - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$50</strong> por crédito de R$50 nas compras acima de R$166,67 ou;<br> VB$100 por crédito de R$100 nas compras acima de R$333,33.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Não válido para produtos selecionados, consulte em loja. Não cumulativo com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Higienópolis 618, São Paulo, SP</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/4d4fa76a-3fa5-42ba-982d-88adbf9fa6f6/logo/Adidas_logo.jpg" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_ed477429b44e15dd602b715f34b7d7dd.setContent(html_b38b012557547fce75231e848ae8f8f0);
+            
+        
+
+        marker_aa72997fc3f9e3cb54e6667d94e7ac48.bindPopup(popup_ed477429b44e15dd602b715f34b7d7dd)
+        ;
+
+        
+    
+    
+            marker_aa72997fc3f9e3cb54e6667d94e7ac48.bindTooltip(
+                `<div>
+                     Adidas Originals - VB$50
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_aa72997fc3f9e3cb54e6667d94e7ac48.setIcon(div_icon_b22b50093ff588d6f8cb498acb47b6c0);
+            
+    
+            var marker_939bbb93d9328a4c17482e42245a683b = L.marker(
+                [-23.5421987, -46.657317899999995],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_421966d9fe4278be1b083c834aca711b = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Levi\u0027s_-23.54220_-46.65732\" class=\u0027animated-icon\u0027\n            data-oferta=\"levi\u0027s\"\n            data-endereco=\"avenida higien\u00f3polis 618, s\u00e3o paulo, sp\"\n            data-vb=\"50.0\"\n            data-porcentagem=\"20\"\n            data-x=\"1\"\n            data-y=\"0\"\n            data-gsize=\"2\"\n            data-lat=\"-23.5421237\"\n            data-lon=\"-46.6573929\"\n            data-centeroffset=\"-0.5\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/469c4565-9f37-4bb5-8177-1d00f0c2ee8d/logo/Levis_logo.jpg\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_939bbb93d9328a4c17482e42245a683b.setIcon(div_icon_421966d9fe4278be1b083c834aca711b);
+        
+    
+        var popup_584a3123880ee722cd79388d51281f7b = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_bcf64e2cb17c336e0a53b20a4e5db6b8 = $(`<div id="html_bcf64e2cb17c336e0a53b20a4e5db6b8" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Levi's - 20%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$50</strong> por R$50 em créditos nas compras acima de R$250 ou;<br> VB$100 por R$100 em créditos nas compras acima de R$500 ou;<br> VB$150 por R$150 em créditos nas compras acima de R$750.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Não cumulativa com itens promocionais.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Higienópolis 618, São Paulo, SP</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/469c4565-9f37-4bb5-8177-1d00f0c2ee8d/logo/Levis_logo.jpg" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_584a3123880ee722cd79388d51281f7b.setContent(html_bcf64e2cb17c336e0a53b20a4e5db6b8);
+            
+        
+
+        marker_939bbb93d9328a4c17482e42245a683b.bindPopup(popup_584a3123880ee722cd79388d51281f7b)
+        ;
+
+        
+    
+    
+            marker_939bbb93d9328a4c17482e42245a683b.bindTooltip(
+                `<div>
+                     Levi's - VB$50
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_939bbb93d9328a4c17482e42245a683b.setIcon(div_icon_421966d9fe4278be1b083c834aca711b);
+            
+    
+            var marker_7bd45244495b001f3ecf8571d30edbd3 = L.marker(
+                [-23.542048700000002, -46.6574679],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_5df67d9f44c5bfcd86bdb799ef8521a4 = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Osklen_-23.54205_-46.65747\" class=\u0027animated-icon\u0027\n            data-oferta=\"osklen\"\n            data-endereco=\"avenida higien\u00f3polis 618, s\u00e3o paulo, sp\"\n            data-vb=\"100.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"1\"\n            data-gsize=\"2\"\n            data-lat=\"-23.5421237\"\n            data-lon=\"-46.6573929\"\n            data-centeroffset=\"-0.5\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_7bd45244495b001f3ecf8571d30edbd3.setIcon(div_icon_5df67d9f44c5bfcd86bdb799ef8521a4);
+        
+    
+        var popup_bb3d9c84217eaadc8e018140ee4d62b1 = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_964c7cd64cfc36b9a9e7ef77c60c1f9e = $(`<div id="html_964c7cd64cfc36b9a9e7ef77c60c1f9e" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Osklen - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$100</strong> por R$100 em crédito nas compras acima de R$333,33 ou;<br> VB$150 por R$150 em crédito nas compras acima de R$ 500.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Oferta não cumulativa com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Higienópolis 618, São Paulo, SP</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_bb3d9c84217eaadc8e018140ee4d62b1.setContent(html_964c7cd64cfc36b9a9e7ef77c60c1f9e);
+            
+        
+
+        marker_7bd45244495b001f3ecf8571d30edbd3.bindPopup(popup_bb3d9c84217eaadc8e018140ee4d62b1)
+        ;
+
+        
+    
+    
+            marker_7bd45244495b001f3ecf8571d30edbd3.bindTooltip(
+                `<div>
+                     Osklen - VB$100
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_7bd45244495b001f3ecf8571d30edbd3.setIcon(div_icon_5df67d9f44c5bfcd86bdb799ef8521a4);
+            
+    
+            var marker_860ac7e385ee2e5b252f285b264abf80 = L.marker(
+                [-23.542048700000002, -46.657317899999995],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_29df2d4c0c95efd9ae2ecf7d79b54a13 = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Valisere_-23.54205_-46.65732\" class=\u0027animated-icon\u0027\n            data-oferta=\"valisere\"\n            data-endereco=\"avenida higien\u00f3polis 618, s\u00e3o paulo, sp\"\n            data-vb=\"30.0\"\n            data-porcentagem=\"30\"\n            data-x=\"1\"\n            data-y=\"1\"\n            data-gsize=\"2\"\n            data-lat=\"-23.5421237\"\n            data-lon=\"-46.6573929\"\n            data-centeroffset=\"-0.5\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/259204f1-1901-4d9e-ab10-59eada30d88d/logo/MicrosoftTeams-image (31).png\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_860ac7e385ee2e5b252f285b264abf80.setIcon(div_icon_29df2d4c0c95efd9ae2ecf7d79b54a13);
+        
+    
+        var popup_d9b840b5d4c025b9e6696700476b9695 = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_3d7cef7b9e4335812c840a219770722a = $(`<div id="html_3d7cef7b9e4335812c840a219770722a" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Valisere - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$30</strong> por R$30 em créditos nas compras acima de R$100 ou;<br> VB$60 por R$60 em créditos nas compras acima de R$200 ou;<br> VB$90 por R$90 em créditos nas compras acima de R$300.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Oferta não cumulativa com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Higienópolis 618, São Paulo, SP</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/259204f1-1901-4d9e-ab10-59eada30d88d/logo/MicrosoftTeams-image (31).png" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_d9b840b5d4c025b9e6696700476b9695.setContent(html_3d7cef7b9e4335812c840a219770722a);
+            
+        
+
+        marker_860ac7e385ee2e5b252f285b264abf80.bindPopup(popup_d9b840b5d4c025b9e6696700476b9695)
+        ;
+
+        
+    
+    
+            marker_860ac7e385ee2e5b252f285b264abf80.bindTooltip(
+                `<div>
+                     Valisere - VB$30
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_860ac7e385ee2e5b252f285b264abf80.setIcon(div_icon_29df2d4c0c95efd9ae2ecf7d79b54a13);
+            
+    
+            var marker_9fd74ddf4e86c8754da0776145cd36ec = L.marker(
+                [-23.0013736, -43.3858868],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_1cd0860356e52f5cb18fc7d28007f347 = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Osklen_-23.00137_-43.38589\" class=\u0027animated-icon\u0027\n            data-oferta=\"osklen\"\n            data-endereco=\"avenida das americas 7777, rio de janeiro, rj\"\n            data-vb=\"100.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"1\"\n            data-lat=\"-23.0013736\"\n            data-lon=\"-43.3858868\"\n            data-centeroffset=\"0.0\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_9fd74ddf4e86c8754da0776145cd36ec.setIcon(div_icon_1cd0860356e52f5cb18fc7d28007f347);
+        
+    
+        var popup_daaae10aa9bfe65563005ce7659f1f2a = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_11d1280e37043de4265ddda4125aba3c = $(`<div id="html_11d1280e37043de4265ddda4125aba3c" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Osklen - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$100</strong> por R$100 em crédito nas compras acima de R$333,33 ou;<br> VB$150 por R$150 em crédito nas compras acima de R$ 500.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Oferta não cumulativa com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Das Americas 7777, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_daaae10aa9bfe65563005ce7659f1f2a.setContent(html_11d1280e37043de4265ddda4125aba3c);
+            
+        
+
+        marker_9fd74ddf4e86c8754da0776145cd36ec.bindPopup(popup_daaae10aa9bfe65563005ce7659f1f2a)
+        ;
+
+        
+    
+    
+            marker_9fd74ddf4e86c8754da0776145cd36ec.bindTooltip(
+                `<div>
+                     Osklen - VB$100
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_9fd74ddf4e86c8754da0776145cd36ec.setIcon(div_icon_1cd0860356e52f5cb18fc7d28007f347);
+            
+    
+            var marker_a1bd0acc48d4b173600447e9b97461fa = L.marker(
+                [-22.9981777, -43.3512628],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_c8aae35908add50942996d75dda89b16 = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Osklen_-22.99818_-43.35126\" class=\u0027animated-icon\u0027\n            data-oferta=\"osklen\"\n            data-endereco=\"avenida das americas 3900, rio de janeiro, rj\"\n            data-vb=\"100.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"1\"\n            data-lat=\"-22.9981777\"\n            data-lon=\"-43.3512628\"\n            data-centeroffset=\"0.0\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_a1bd0acc48d4b173600447e9b97461fa.setIcon(div_icon_c8aae35908add50942996d75dda89b16);
+        
+    
+        var popup_7cd12fdcd6902ee949a13673ac659fd2 = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_666e1f3bde3a0e3ddaaa7506b9b59ff1 = $(`<div id="html_666e1f3bde3a0e3ddaaa7506b9b59ff1" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Osklen - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$100</strong> por R$100 em crédito nas compras acima de R$333,33 ou;<br> VB$150 por R$150 em crédito nas compras acima de R$ 500.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Oferta não cumulativa com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Das Americas 3900, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_7cd12fdcd6902ee949a13673ac659fd2.setContent(html_666e1f3bde3a0e3ddaaa7506b9b59ff1);
+            
+        
+
+        marker_a1bd0acc48d4b173600447e9b97461fa.bindPopup(popup_7cd12fdcd6902ee949a13673ac659fd2)
+        ;
+
+        
+    
+    
+            marker_a1bd0acc48d4b173600447e9b97461fa.bindTooltip(
+                `<div>
+                     Osklen - VB$100
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_a1bd0acc48d4b173600447e9b97461fa.setIcon(div_icon_c8aae35908add50942996d75dda89b16);
+            
+    
+            var marker_58be8e04eebbb1e28e2e336a8ac44b94 = L.marker(
+                [-22.997762, -43.3579799],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_5cdb12baf4e52f42dcc68f436c56cbc2 = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Adidas_-22.99776_-43.35798\" class=\u0027animated-icon\u0027\n            data-oferta=\"adidas\"\n            data-endereco=\"avenida das americas 4666, rio de janeiro, rj\"\n            data-vb=\"50.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"1\"\n            data-lat=\"-22.997762\"\n            data-lon=\"-43.3579799\"\n            data-centeroffset=\"0.0\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/4d4fa76a-3fa5-42ba-982d-88adbf9fa6f6/logo/Adidas_logo.jpg\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_58be8e04eebbb1e28e2e336a8ac44b94.setIcon(div_icon_5cdb12baf4e52f42dcc68f436c56cbc2);
+        
+    
+        var popup_b2701ce4357be63216678eeb98a1d295 = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_876a82756e9a59a5f4ac1e3b70b304e5 = $(`<div id="html_876a82756e9a59a5f4ac1e3b70b304e5" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Adidas - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$50</strong> por crédito de R$50 nas compras acima de R$166,67 ou;<br> VB$100 por crédito de R$100 nas compras acima de R$333,33.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Não válido para produtos selecionados, consulte em loja. Não cumulativo com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Das Americas 4666, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/4d4fa76a-3fa5-42ba-982d-88adbf9fa6f6/logo/Adidas_logo.jpg" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_b2701ce4357be63216678eeb98a1d295.setContent(html_876a82756e9a59a5f4ac1e3b70b304e5);
+            
+        
+
+        marker_58be8e04eebbb1e28e2e336a8ac44b94.bindPopup(popup_b2701ce4357be63216678eeb98a1d295)
+        ;
+
+        
+    
+    
+            marker_58be8e04eebbb1e28e2e336a8ac44b94.bindTooltip(
+                `<div>
+                     Adidas - VB$50
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_58be8e04eebbb1e28e2e336a8ac44b94.setIcon(div_icon_5cdb12baf4e52f42dcc68f436c56cbc2);
+            
+    
+            var marker_0e49e68c19da5301d836d4bca24f430b = L.marker(
+                [-22.9862681, -43.2287432],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_b326180418d2fbd893fafe3c5a21196d = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_World_Wine_-22.98627_-43.22874\" class=\u0027animated-icon\u0027\n            data-oferta=\"world wine\"\n            data-endereco=\"avenida ataulfo de paiva 270, rio de janeiro, rj\"\n            data-vb=\"100.0\"\n            data-porcentagem=\"33\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"1\"\n            data-lat=\"-22.9862681\"\n            data-lon=\"-43.2287432\"\n            data-centeroffset=\"0.0\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/52c586ec-b218-490a-98ee-bcad2c32e33b/logo/World Wine_logo.jpeg\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_0e49e68c19da5301d836d4bca24f430b.setIcon(div_icon_b326180418d2fbd893fafe3c5a21196d);
+        
+    
+        var popup_1ea6445ff2d22595b2afbe7a53de52cd = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_872d1feaea936dd0a5bc9f75a77822bb = $(`<div id="html_872d1feaea936dd0a5bc9f75a77822bb" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>World Wine - 33%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$100</strong> por R$100 em crédito nas compras acima de R$300.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Válido para lojas físicas e site. Não cumulativa com outras promoções, 1 uso por CPF.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Ataulfo De Paiva 270, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/52c586ec-b218-490a-98ee-bcad2c32e33b/logo/World Wine_logo.jpeg" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_1ea6445ff2d22595b2afbe7a53de52cd.setContent(html_872d1feaea936dd0a5bc9f75a77822bb);
+            
+        
+
+        marker_0e49e68c19da5301d836d4bca24f430b.bindPopup(popup_1ea6445ff2d22595b2afbe7a53de52cd)
+        ;
+
+        
+    
+    
+            marker_0e49e68c19da5301d836d4bca24f430b.bindTooltip(
+                `<div>
+                     World Wine - VB$100
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_0e49e68c19da5301d836d4bca24f430b.setIcon(div_icon_b326180418d2fbd893fafe3c5a21196d);
+            
+    
+            var marker_9c29ebaaa5bd58231b086d6ba8565674 = L.marker(
+                [-22.9847205, -43.1960486],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_c63df3e598632185b78d437595fce83a = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Osklen_-22.98472_-43.19605\" class=\u0027animated-icon\u0027\n            data-oferta=\"osklen\"\n            data-endereco=\"rua visconde de piraja 414, rio de janeiro, rj\"\n            data-vb=\"100.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"1\"\n            data-lat=\"-22.9847205\"\n            data-lon=\"-43.1960486\"\n            data-centeroffset=\"0.0\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_9c29ebaaa5bd58231b086d6ba8565674.setIcon(div_icon_c63df3e598632185b78d437595fce83a);
+        
+    
+        var popup_5a97389f649a664f3d21b4f6362dae42 = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_4a0e82c2e8bf38561470bc966eecb86c = $(`<div id="html_4a0e82c2e8bf38561470bc966eecb86c" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Osklen - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$100</strong> por R$100 em crédito nas compras acima de R$333,33 ou;<br> VB$150 por R$150 em crédito nas compras acima de R$ 500.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Oferta não cumulativa com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Rua Visconde De Piraja 414, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_5a97389f649a664f3d21b4f6362dae42.setContent(html_4a0e82c2e8bf38561470bc966eecb86c);
+            
+        
+
+        marker_9c29ebaaa5bd58231b086d6ba8565674.bindPopup(popup_5a97389f649a664f3d21b4f6362dae42)
+        ;
+
+        
+    
+    
+            marker_9c29ebaaa5bd58231b086d6ba8565674.bindTooltip(
+                `<div>
+                     Osklen - VB$100
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_9c29ebaaa5bd58231b086d6ba8565674.setIcon(div_icon_c63df3e598632185b78d437595fce83a);
+            
+    
+            var marker_065934ad34116d9a7adbe686567f03e5 = L.marker(
+                [-22.9834797, -43.2091849],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_a38e3ce66c37d4efd12c061b94bdd6dd = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Adidas_-22.98348_-43.20918\" class=\u0027animated-icon\u0027\n            data-oferta=\"adidas\"\n            data-endereco=\"rua garcia d\u0027avila 66, rio de janeiro, rj\"\n            data-vb=\"50.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"1\"\n            data-lat=\"-22.9834797\"\n            data-lon=\"-43.2091849\"\n            data-centeroffset=\"0.0\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/4d4fa76a-3fa5-42ba-982d-88adbf9fa6f6/logo/Adidas_logo.jpg\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_065934ad34116d9a7adbe686567f03e5.setIcon(div_icon_a38e3ce66c37d4efd12c061b94bdd6dd);
+        
+    
+        var popup_932d2772097846c923ddd01392383a73 = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_2b27fd61b4ddc8e2d368d27efb01e406 = $(`<div id="html_2b27fd61b4ddc8e2d368d27efb01e406" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Adidas - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$50</strong> por crédito de R$50 nas compras acima de R$166,67 ou;<br> VB$100 por crédito de R$100 nas compras acima de R$333,33.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Não válido para produtos selecionados, consulte em loja. Não cumulativo com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Rua Garcia D'Avila 66, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/4d4fa76a-3fa5-42ba-982d-88adbf9fa6f6/logo/Adidas_logo.jpg" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_932d2772097846c923ddd01392383a73.setContent(html_2b27fd61b4ddc8e2d368d27efb01e406);
+            
+        
+
+        marker_065934ad34116d9a7adbe686567f03e5.bindPopup(popup_932d2772097846c923ddd01392383a73)
+        ;
+
+        
+    
+    
+            marker_065934ad34116d9a7adbe686567f03e5.bindTooltip(
+                `<div>
+                     Adidas - VB$50
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_065934ad34116d9a7adbe686567f03e5.setIcon(div_icon_a38e3ce66c37d4efd12c061b94bdd6dd);
+            
+    
+            var marker_039948ab5f9e89b783ce9c5f21ca9aab = L.marker(
+                [-22.9823307, -43.2165802],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_a9ad503e5a3ef8ea3bbca695e58ed7eb = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Osklen_-22.98233_-43.21658\" class=\u0027animated-icon\u0027\n            data-oferta=\"osklen\"\n            data-endereco=\"avenida afranio de melo franco 290, rio de janeiro, rj\"\n            data-vb=\"100.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"1\"\n            data-lat=\"-22.9823307\"\n            data-lon=\"-43.2165802\"\n            data-centeroffset=\"0.0\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_039948ab5f9e89b783ce9c5f21ca9aab.setIcon(div_icon_a9ad503e5a3ef8ea3bbca695e58ed7eb);
+        
+    
+        var popup_1cdd5ea8777fda53eaf0c28a5c57bfec = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_7908d34d9f9316be76e6ca64ca71e6e4 = $(`<div id="html_7908d34d9f9316be76e6ca64ca71e6e4" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Osklen - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$100</strong> por R$100 em crédito nas compras acima de R$333,33 ou;<br> VB$150 por R$150 em crédito nas compras acima de R$ 500.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Oferta não cumulativa com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Afranio De Melo Franco 290, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_1cdd5ea8777fda53eaf0c28a5c57bfec.setContent(html_7908d34d9f9316be76e6ca64ca71e6e4);
+            
+        
+
+        marker_039948ab5f9e89b783ce9c5f21ca9aab.bindPopup(popup_1cdd5ea8777fda53eaf0c28a5c57bfec)
+        ;
+
+        
+    
+    
+            marker_039948ab5f9e89b783ce9c5f21ca9aab.bindTooltip(
+                `<div>
+                     Osklen - VB$100
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_039948ab5f9e89b783ce9c5f21ca9aab.setIcon(div_icon_a9ad503e5a3ef8ea3bbca695e58ed7eb);
+            
+    
+            var marker_8e6616fb38207b071d61478cea2ea711 = L.marker(
+                [-22.956828599999998, -43.176952],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_28e3b901e0af57b38075d7937e7f375b = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Adidas_-22.95683_-43.17695\" class=\u0027animated-icon\u0027\n            data-oferta=\"adidas\"\n            data-endereco=\"avenida lauro sodre 445, rio de janeiro, rj\"\n            data-vb=\"50.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"2\"\n            data-lat=\"-22.9567536\"\n            data-lon=\"-43.176877\"\n            data-centeroffset=\"-0.5\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/4d4fa76a-3fa5-42ba-982d-88adbf9fa6f6/logo/Adidas_logo.jpg\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_8e6616fb38207b071d61478cea2ea711.setIcon(div_icon_28e3b901e0af57b38075d7937e7f375b);
+        
+    
+        var popup_91ff1028457833bfd5664e138c7dd5ca = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_b57386e9210e8594e9adad88b820b385 = $(`<div id="html_b57386e9210e8594e9adad88b820b385" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Adidas - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$50</strong> por crédito de R$50 nas compras acima de R$166,67 ou;<br> VB$100 por crédito de R$100 nas compras acima de R$333,33.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Não válido para produtos selecionados, consulte em loja. Não cumulativo com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Lauro Sodre 445, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/4d4fa76a-3fa5-42ba-982d-88adbf9fa6f6/logo/Adidas_logo.jpg" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_91ff1028457833bfd5664e138c7dd5ca.setContent(html_b57386e9210e8594e9adad88b820b385);
+            
+        
+
+        marker_8e6616fb38207b071d61478cea2ea711.bindPopup(popup_91ff1028457833bfd5664e138c7dd5ca)
+        ;
+
+        
+    
+    
+            marker_8e6616fb38207b071d61478cea2ea711.bindTooltip(
+                `<div>
+                     Adidas - VB$50
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_8e6616fb38207b071d61478cea2ea711.setIcon(div_icon_28e3b901e0af57b38075d7937e7f375b);
+            
+    
+            var marker_78d727c2f28ccf0c2adc19dac19e6448 = L.marker(
+                [-22.956828599999998, -43.176801999999995],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_f9da3e741f6a9cfe4e77aec8ccef0f54 = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Arranjos_Express_-22.95683_-43.17680\" class=\u0027animated-icon\u0027\n            data-oferta=\"arranjos express\"\n            data-endereco=\"avenida lauro sodre 445, rio de janeiro, rj\"\n            data-vb=\"15.0\"\n            data-porcentagem=\"15\"\n            data-x=\"1\"\n            data-y=\"0\"\n            data-gsize=\"2\"\n            data-lat=\"-22.9567536\"\n            data-lon=\"-43.176877\"\n            data-centeroffset=\"-0.5\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/0de003c2-e4da-4f19-8900-8a7185ac2e96/logo/download (3).png\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_78d727c2f28ccf0c2adc19dac19e6448.setIcon(div_icon_f9da3e741f6a9cfe4e77aec8ccef0f54);
+        
+    
+        var popup_c9ae1a64336c97c85ff752ba4426a426 = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_834a05ea88dbb535f0f4ad3a8bfa85c8 = $(`<div id="html_834a05ea88dbb535f0f4ad3a8bfa85c8" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Arranjos Express - 15%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$15</strong> por R$15 em créditos nos serviços da Arranjos Express.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Limitado a 15% Off.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Lauro Sodre 445, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/0de003c2-e4da-4f19-8900-8a7185ac2e96/logo/download (3).png" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_c9ae1a64336c97c85ff752ba4426a426.setContent(html_834a05ea88dbb535f0f4ad3a8bfa85c8);
+            
+        
+
+        marker_78d727c2f28ccf0c2adc19dac19e6448.bindPopup(popup_c9ae1a64336c97c85ff752ba4426a426)
+        ;
+
+        
+    
+    
+            marker_78d727c2f28ccf0c2adc19dac19e6448.bindTooltip(
+                `<div>
+                     Arranjos Express - VB$15
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_78d727c2f28ccf0c2adc19dac19e6448.setIcon(div_icon_f9da3e741f6a9cfe4e77aec8ccef0f54);
+            
+    
+            var marker_290245de25064f47df865c6d76e76bb6 = L.marker(
+                [-22.922041099999998, -43.2353028],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_54b38bfe744f4f04c318887dcb37f564 = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Adidas_Originals_-22.92204_-43.23530\" class=\u0027animated-icon\u0027\n            data-oferta=\"adidas originals\"\n            data-endereco=\"avenida maracana 987, rio de janeiro, rj\"\n            data-vb=\"50.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"2\"\n            data-lat=\"-22.9219661\"\n            data-lon=\"-43.2352278\"\n            data-centeroffset=\"-0.5\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/4d4fa76a-3fa5-42ba-982d-88adbf9fa6f6/logo/Adidas_logo.jpg\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_290245de25064f47df865c6d76e76bb6.setIcon(div_icon_54b38bfe744f4f04c318887dcb37f564);
+        
+    
+        var popup_5236f0096d7a4b52675eff0ba19d3c4d = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_d9a80e3afbc2a464a0a6583e08b593d9 = $(`<div id="html_d9a80e3afbc2a464a0a6583e08b593d9" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Adidas Originals - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$50</strong> por crédito de R$50 nas compras acima de R$166,67 ou;<br> VB$100 por crédito de R$100 nas compras acima de R$333,33.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Não válido para produtos selecionados, consulte em loja. Não cumulativo com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Maracana 987, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/4d4fa76a-3fa5-42ba-982d-88adbf9fa6f6/logo/Adidas_logo.jpg" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_5236f0096d7a4b52675eff0ba19d3c4d.setContent(html_d9a80e3afbc2a464a0a6583e08b593d9);
+            
+        
+
+        marker_290245de25064f47df865c6d76e76bb6.bindPopup(popup_5236f0096d7a4b52675eff0ba19d3c4d)
+        ;
+
+        
+    
+    
+            marker_290245de25064f47df865c6d76e76bb6.bindTooltip(
+                `<div>
+                     Adidas Originals - VB$50
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_290245de25064f47df865c6d76e76bb6.setIcon(div_icon_54b38bfe744f4f04c318887dcb37f564);
+            
+    
+            var marker_a65387d186f2aaadd7bb5b890bbed6ee = L.marker(
+                [-22.922041099999998, -43.235152799999994],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_73eabe9433a589eb48061f0bee373371 = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Osklen_-22.92204_-43.23515\" class=\u0027animated-icon\u0027\n            data-oferta=\"osklen\"\n            data-endereco=\"avenida maracana 987, rio de janeiro, rj\"\n            data-vb=\"100.0\"\n            data-porcentagem=\"30\"\n            data-x=\"1\"\n            data-y=\"0\"\n            data-gsize=\"2\"\n            data-lat=\"-22.9219661\"\n            data-lon=\"-43.2352278\"\n            data-centeroffset=\"-0.5\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_a65387d186f2aaadd7bb5b890bbed6ee.setIcon(div_icon_73eabe9433a589eb48061f0bee373371);
+        
+    
+        var popup_c7b627fcfcda8604aa6e559ce00154c2 = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_5772658eb612f64d69c669e479279694 = $(`<div id="html_5772658eb612f64d69c669e479279694" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Osklen - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$100</strong> por R$100 em crédito nas compras acima de R$333,33 ou;<br> VB$150 por R$150 em crédito nas compras acima de R$ 500.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Oferta não cumulativa com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Maracana 987, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/582da3f3-d53e-4103-bd8f-29f98d30363f/logo/okok.JPG" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_c7b627fcfcda8604aa6e559ce00154c2.setContent(html_5772658eb612f64d69c669e479279694);
+            
+        
+
+        marker_a65387d186f2aaadd7bb5b890bbed6ee.bindPopup(popup_c7b627fcfcda8604aa6e559ce00154c2)
+        ;
+
+        
+    
+    
+            marker_a65387d186f2aaadd7bb5b890bbed6ee.bindTooltip(
+                `<div>
+                     Osklen - VB$100
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_a65387d186f2aaadd7bb5b890bbed6ee.setIcon(div_icon_73eabe9433a589eb48061f0bee373371);
+            
+    
+            var marker_3470f0c2b45d0c0fae1764382ff18f15 = L.marker(
+                [-22.8803916, -43.258928],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_ddcf34f2a97a14c628f1f0e2fd304d6c = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Samsung_-22.88039_-43.25893\" class=\u0027animated-icon\u0027\n            data-oferta=\"samsung\"\n            data-endereco=\"avenida dom helder camara 5332, rio de janeiro, rj\"\n            data-vb=\"250.0\"\n            data-porcentagem=\"25\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"1\"\n            data-lat=\"-22.8803916\"\n            data-lon=\"-43.258928\"\n            data-centeroffset=\"0.0\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/586d5f3a-a475-48e7-9c81-27c5fd798343/logo/393166964_886560459500588_1356464869100642965_n (1).jpg\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_3470f0c2b45d0c0fae1764382ff18f15.setIcon(div_icon_ddcf34f2a97a14c628f1f0e2fd304d6c);
+        
+    
+        var popup_cb13b9517269a3fc85aa17978ab69f45 = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_959afe5b820dbb773421b95a2b90c825 = $(`<div id="html_959afe5b820dbb773421b95a2b90c825" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Samsung - 25%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$250</strong> por R$250 em crédito nas compras acima de R$1.000.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Cumulativa com outras promoções, 1 uso por CPF.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Dom Helder Camara 5332, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/586d5f3a-a475-48e7-9c81-27c5fd798343/logo/393166964_886560459500588_1356464869100642965_n (1).jpg" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_cb13b9517269a3fc85aa17978ab69f45.setContent(html_959afe5b820dbb773421b95a2b90c825);
+            
+        
+
+        marker_3470f0c2b45d0c0fae1764382ff18f15.bindPopup(popup_cb13b9517269a3fc85aa17978ab69f45)
+        ;
+
+        
+    
+    
+            marker_3470f0c2b45d0c0fae1764382ff18f15.bindTooltip(
+                `<div>
+                     Samsung - VB$250
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_3470f0c2b45d0c0fae1764382ff18f15.setIcon(div_icon_ddcf34f2a97a14c628f1f0e2fd304d6c);
+            
+    
+            var marker_003f749e3389f2c68d2db3f9a5a1350f = L.marker(
+                [-22.8018773, -43.2017915],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_2398d149c83e2f54530da98ca8cf4b0b = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Valisere_-22.80188_-43.20179\" class=\u0027animated-icon\u0027\n            data-oferta=\"valisere\"\n            data-endereco=\"avenida maestro paulo silva 400, rio de janeiro, rj\"\n            data-vb=\"30.0\"\n            data-porcentagem=\"30\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"1\"\n            data-lat=\"-22.8018773\"\n            data-lon=\"-43.2017915\"\n            data-centeroffset=\"0.0\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/259204f1-1901-4d9e-ab10-59eada30d88d/logo/MicrosoftTeams-image (31).png\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_003f749e3389f2c68d2db3f9a5a1350f.setIcon(div_icon_2398d149c83e2f54530da98ca8cf4b0b);
+        
+    
+        var popup_986e9d275211042e6edd8d36f1c80bde = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_5d2eb83a5398f63ad6ea66cf15fef8e7 = $(`<div id="html_5d2eb83a5398f63ad6ea66cf15fef8e7" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Valisere - 30%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$30</strong> por R$30 em créditos nas compras acima de R$100 ou;<br> VB$60 por R$60 em créditos nas compras acima de R$200 ou;<br> VB$90 por R$90 em créditos nas compras acima de R$300.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Oferta não cumulativa com outras promoções.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Avenida Maestro Paulo Silva 400, Rio De Janeiro, RJ</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/259204f1-1901-4d9e-ab10-59eada30d88d/logo/MicrosoftTeams-image (31).png" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_986e9d275211042e6edd8d36f1c80bde.setContent(html_5d2eb83a5398f63ad6ea66cf15fef8e7);
+            
+        
+
+        marker_003f749e3389f2c68d2db3f9a5a1350f.bindPopup(popup_986e9d275211042e6edd8d36f1c80bde)
+        ;
+
+        
+    
+    
+            marker_003f749e3389f2c68d2db3f9a5a1350f.bindTooltip(
+                `<div>
+                     Valisere - VB$30
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_003f749e3389f2c68d2db3f9a5a1350f.setIcon(div_icon_2398d149c83e2f54530da98ca8cf4b0b);
+            
+    
+            var marker_5c84c941bbed1b131b46e4e0eca31a98 = L.marker(
+                [-21.7876526, -46.5652934],
+                {
+}
+            ).addTo(map_a02462b9792d9cee3fd6c61a272f6777);
+        
+    
+            var div_icon_ce60568f48d4635c939fbe5341a6ed98 = L.divIcon({
+  "html": "\n        \u003cdiv id=\"marker_Morana_-21.78765_-46.56529\" class=\u0027animated-icon\u0027\n            data-oferta=\"morana\"\n            data-endereco=\"rua rio de janeiro 130, po\u00e7os de caldas, mg\"\n            data-vb=\"25.0\"\n            data-porcentagem=\"20\"\n            data-x=\"0\"\n            data-y=\"0\"\n            data-gsize=\"1\"\n            data-lat=\"-21.7876526\"\n            data-lon=\"-46.5652934\"\n            data-centeroffset=\"0.0\"\n            style=\"background-image: url(\u0027https://d3bxicb3mnzmrq.cloudfront.net/offers/4de35e13-93ee-448b-8744-d21b71676c53/logo/logo_240x240.jpg\u0027);\"\u003e\n        \u003c/div\u003e\n        ",
+  "className": "empty",
+});
+            marker_5c84c941bbed1b131b46e4e0eca31a98.setIcon(div_icon_ce60568f48d4635c939fbe5341a6ed98);
+        
+    
+        var popup_11c6a18d82a763a15330ec4964e497f9 = L.popup({
+  "maxWidth": 450,
+});
+
+        
+            
+                var html_719ff5998f2fecdcfdb7fb948e9537e9 = $(`<div id="html_719ff5998f2fecdcfdb7fb948e9537e9" style="width: 100.0%; height: 100.0%;">         <div style='background-color: #F9A81B; font-size: 16px; line-height: 1.4; max-width: 85vw; padding: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #000;'>             <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>                 <div style='font-weight: bold; font-size: 15px;'>Morana - 20%</div>                 <div><img src="https://i.imgur.com/qsKvPzE.png" style="max-width: 70px; height: auto;"></div>             </div>             <div style='font-size: 14px;'><strong>VB$25</strong> por R$25 em créditos nas compras acima de R$125 ou;<br> VB$35 por R$35 em créditos nas compras acima de R$175 ou;<br> VB$65 por R$65 em créditos nas compras acima de R$325.</div>             <div style='font-size: 11px; color: #333; margin-top: 6px;'>ℹ️ Não cumulativa para itens promocionais.</div>             <div style='font-size: 12px; color: #222; margin-top: 6px;'><i>Endereço: Rua Rio De Janeiro 130, Poços De Caldas, MG</i></div>             <div style='margin-top: 8px; text-align: center;'>                 <img src="https://d3bxicb3mnzmrq.cloudfront.net/offers/4de35e13-93ee-448b-8744-d21b71676c53/logo/logo_240x240.jpg" style="width: 100%; max-width: 180px; height: auto; border-radius: 6px;" alt="Imagem da oferta">             </div>         </div>         </div>`)[0];
+                popup_11c6a18d82a763a15330ec4964e497f9.setContent(html_719ff5998f2fecdcfdb7fb948e9537e9);
+            
+        
+
+        marker_5c84c941bbed1b131b46e4e0eca31a98.bindPopup(popup_11c6a18d82a763a15330ec4964e497f9)
+        ;
+
+        
+    
+    
+            marker_5c84c941bbed1b131b46e4e0eca31a98.bindTooltip(
+                `<div>
+                     Morana - VB$25
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_5c84c941bbed1b131b46e4e0eca31a98.setIcon(div_icon_ce60568f48d4635c939fbe5341a6ed98);
+            
+</script>
+</html>
